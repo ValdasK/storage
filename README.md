@@ -1,6 +1,6 @@
 Minimal HTTP server to store and retrieve files from a folder. Compiled for Linux AMD64, but you can re-compile to any Go supported architecture.
 
-###### Use cases:
+#### Use cases:
  - sharing files via HTTP
  - storing files for long term (like artifact repository)
 
