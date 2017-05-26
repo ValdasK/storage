@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path"
 
 	"log"
 
@@ -16,9 +17,9 @@ import (
 )
 
 var routes = map[string]fr.Router{
-	"GET":    fr.New("/:filename", serveStaticFile),
-	"POST":   fr.New("/:filename", uploadFile),
-	"DELETE": fr.New("/:filename", deleteHandler),
+	"GET":    fr.New("/*filename", serveStaticFile),
+	"POST":   fr.New("/*filename", uploadFile),
+	"DELETE": fr.New("/*filename", deleteHandler),
 }
 
 var router = fr.RouterFunc(func(req *http.Request) http.Handler {
@@ -27,14 +28,14 @@ var router = fr.RouterFunc(func(req *http.Request) http.Handler {
 
 var app = fr.RouterFunc(func(req *http.Request) http.Handler {
 	if h := router.Route(req); h != nil {
-		return h // routed and can be served
+		return h
 	}
 
 	var allows []string
 	for method, routes := range routes {
 		if h := routes.Route(req); h != nil {
 			allows = append(allows, method)
-			fr.Recycle(req) // we will not serve it, need to recycle
+			fr.Recycle(req)
 		}
 	}
 
@@ -53,13 +54,14 @@ const _defaultPath = "/tmp"
 
 var storagePath = _defaultPath
 var maxFileSize = int64(_64M)
+var debugEnabled = false
 
 func main() {
 
 	port := flag.Int("port", 8222, "Port for connecting to application")
 	flag.Int64Var(&maxFileSize, "max", _64M, "Max uploaded file size in bytes")
 	flag.StringVar(&storagePath, "path", _defaultPath, "Storage path for files")
-
+	flag.BoolVar(&debugEnabled, "debug", false, "Enable debug output")
 	flag.Parse()
 
 	storageStat, err := os.Stat(storagePath)
@@ -82,7 +84,8 @@ func deleteHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err := os.Remove(storagePath + filename)
+	path := path.Join(storagePath, filename)
+	err := os.RemoveAll(path)
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -93,16 +96,31 @@ func deleteHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	debug("Removed file" + path)
+
 	successResponse(res)
 }
 
 func serveStaticFile(res http.ResponseWriter, req *http.Request) {
-	http.ServeFile(res, req, storagePath+fr.Parameters(req).ByName("filename"))
+	path := path.Join(storagePath, fr.Parameters(req).ByName("filename"))
+
+	debug("Served path: " + path)
+
+	http.ServeFile(res, req, path)
 }
 
 func uploadFile(res http.ResponseWriter, req *http.Request) {
 
+	var folder = fr.Parameters(req).ByName("filename")
+
+	var folderPath = path.Join(storagePath, folder)
+
 	var err error
+
+	if err = os.MkdirAll(folderPath, 0744); nil != err {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if err = req.ParseMultipartForm(maxFileSize); nil != err {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
@@ -119,7 +137,8 @@ func uploadFile(res http.ResponseWriter, req *http.Request) {
 			}
 			// open destination
 			var outfile *os.File
-			if outfile, err = os.Create(storagePath + hdr.Filename); nil != err {
+			path := path.Join(folderPath, hdr.Filename)
+			if outfile, err = os.Create(path); nil != err {
 				http.Error(res, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -128,6 +147,8 @@ func uploadFile(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 
+			debug("Uploaded file " + path)
+
 			successResponse(res)
 		}
 	}
@@ -135,4 +156,11 @@ func uploadFile(res http.ResponseWriter, req *http.Request) {
 
 func successResponse(res http.ResponseWriter) {
 	res.Write([]byte("ok"))
+}
+
+func debug(output string) {
+	if !debugEnabled {
+		return
+	}
+	log.Println(output)
 }

@@ -18,7 +18,7 @@ To keep server up you should run it with some process manager, for example, [sup
 
 Then, you are able to upload file `file.tar.gz` via HTTP post using [curl]([https://curl.haxx.se/):
 
-    curl -X POST http://localhost:8223 -F anythingHere=@file.tar.gz
+    curl -X POST http://localhost:8223/newFolder -F anythingHere=@file.tar.gz
 
 Multiple file uploads are supported too:
 
@@ -26,7 +26,7 @@ Multiple file uploads are supported too:
 
 #### Retrieving files
 
-Uploaded files should be available at `http://localhost:8223/{fileName}`
+Uploaded files should be available at `http://localhost:8223/{optionalFolder}/{fileName}`
 
 #### Removing files
 
@@ -38,13 +38,14 @@ There are no limits who can create and delete files, to secure this server, use 
 
 ### Limitations
  - Files with same name are overwritten without any warnings
- - Folders are not supported
  - HTTPS is not supported without additional proxy
- - It is not possible to mass delete files, only one by one
+ - It is not possible to mass delete files, only one by one or whole directory
 
 ### Command line options
 
     Usage of ./storage:
+        -debug
+        	Enable debug output
         -max int
              Max uploaded file size in bytes (default 65536)
         -path string
