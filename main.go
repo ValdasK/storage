@@ -1,15 +1,16 @@
 package main
 
 import (
+	"errors"
 	"flag"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
-	"strings"
 
 	"log"
+
+	"strconv"
 
 	fr "github.com/DATA-DOG/fastroute"
 )
@@ -42,22 +43,22 @@ var app = fr.RouterFunc(func(req *http.Request) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Allow", strings.Join(allows, ","))
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintln(w, http.StatusText(http.StatusMethodNotAllowed))
+		err := errors.New("Method not allowed")
+		http.Error(w, err.Error(), http.StatusMethodNotAllowed)
 	})
 })
 
 const _64M = (1 << 10) * 64
+const _defaultPath = "/tmp"
 
-var storagePath = "/tmp"
-var maxFileSize = _64M
+var storagePath = _defaultPath
+var maxFileSize = int64(_64M)
 
 func main() {
 
 	port := flag.Int("port", 8222, "Port for connecting to application")
-	flag.IntVar(&maxFileSize, "max", _64M, "Max uploaded file size in bytes")
-	flag.StringVar(&storagePath, "path", "/tmp", "Storage path for files")
+	flag.Int64Var(&maxFileSize, "max", _64M, "Max uploaded file size in bytes")
+	flag.StringVar(&storagePath, "path", _defaultPath, "Storage path for files")
 
 	flag.Parse()
 
@@ -70,14 +71,14 @@ func main() {
 		log.Fatal("Storage path is not a folder")
 	}
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), app))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), app))
 }
 
-func deleteHandler(w http.ResponseWriter, req *http.Request) {
+func deleteHandler(res http.ResponseWriter, req *http.Request) {
 	var filename = fr.Parameters(req).ByName("filename")
 
 	if filename == "" {
-		http.Error(w, "Not yet implemented", http.StatusNotImplemented)
+		http.Error(res, "Not yet implemented", http.StatusNotImplemented)
 		return
 	}
 
@@ -85,25 +86,25 @@ func deleteHandler(w http.ResponseWriter, req *http.Request) {
 
 	if err != nil {
 		if os.IsNotExist(err) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			http.Error(res, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write([]byte("ok"))
+	successResponse(res)
 }
 
-func serveStaticFile(w http.ResponseWriter, req *http.Request) {
-	http.ServeFile(w, req, storagePath+fr.Parameters(req).ByName("filename"))
+func serveStaticFile(res http.ResponseWriter, req *http.Request) {
+	http.ServeFile(res, req, storagePath+fr.Parameters(req).ByName("filename"))
 }
 
 func uploadFile(res http.ResponseWriter, req *http.Request) {
 
 	var err error
 
-	if err = req.ParseMultipartForm(_64M); nil != err {
+	if err = req.ParseMultipartForm(maxFileSize); nil != err {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -126,7 +127,12 @@ func uploadFile(res http.ResponseWriter, req *http.Request) {
 				http.Error(res, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			res.Write([]byte("ok"))
+
+			successResponse(res)
 		}
 	}
+}
+
+func successResponse(res http.ResponseWriter) {
+	res.Write([]byte("ok"))
 }
