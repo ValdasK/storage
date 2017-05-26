@@ -1,12 +1,12 @@
 Minimal HTTP server to store and retrieve files from a folder. Compiled for Linux AMD64, but you can re-compile to any Go supported architecture.
 
-##Use cases:
+###### Use cases:
  - sharing files via HTTP
  - storing files for long term (like artifact repository)
 
-##Usage examples
+## Usage examples
 
-####Running application
+#### Running application
 
 Run storage and expose all files in `/home/user/files` to `localhost:8223`:
 
@@ -14,7 +14,7 @@ Run storage and expose all files in `/home/user/files` to `localhost:8223`:
 
 To keep server up you should run it with some process manager, for example, [supervisor]([http://supervisord.org/).
 
-####Uploading files
+#### Uploading files
 
 Then, you are able to upload file `file.tar.gz` via HTTP post using [curl]([https://curl.haxx.se/):
 
@@ -24,25 +24,25 @@ Multiple file uploads are supported too:
 
     curl -X POST http://localhost:8223 -F anythingHere=@file.tar.gz -F somethingElse=@file2.tar.gz
 
-####Retrieving files
+#### Retrieving files
 
 Uploaded files should be available at `http://localhost:8223/{fileName}`
 
-###Removal of files
+#### Removing files
 
     curl -X DELETE http://localhost:8223/{fileName}
 
-###Security considerations
+### Security considerations
 
 There are no limits who can create and delete files, to secure this server, use proxy with access authentication and specific firewall rules to avoid unwanted traffic.
 
-###Limitations
+### Limitations
  - Files with same name are overwritten without any warnings
  - Folders are not supported
  - HTTPS is not supported without additional proxy
  - It is not possible to mass delete files, only one by one
 
-###Command line options
+### Command line options
 
     Usage of ./storage:
         -max int
